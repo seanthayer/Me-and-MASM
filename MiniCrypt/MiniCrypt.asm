@@ -2,13 +2,11 @@ TITLE MiniCrypt  (MiniCrypt.asm)
 
 INCLUDE Irvine32.inc
 
-index_k EQU DWORD PTR [ebp - 4]
-index_j EQU DWORD PTR [ebp - 8]
-index_i EQU DWORD PTR [ebp - 12]
+index_i EQU DWORD PTR [ebp - 4]
 
 .data
 
-    KSA         BYTE    256 DUP(0)
+    S           BYTE    256 DUP(0)
 
     key         BYTE    "Secret"
     keyLength   DWORD   6
@@ -20,12 +18,12 @@ main PROC
 
     push    keyLength
     push    OFFSET key
-    push    OFFSET KSA
-    call    initializeKSA
+    push    OFFSET S
+    call    KSA
 
     mov     eax, 0
     mov     ecx, 256
-    mov     esi, OFFSET KSA
+    mov     esi, OFFSET S
     printLoop:
         mov     al, [esi]
 
@@ -40,24 +38,38 @@ main PROC
 main ENDP
 
 ; ---------------------------------------------------------------------
-; NAME:     initializeKSA
+; NAME:     KSA (Key-scheduling algorithm)
 ;
-; DESC:     Sets each element in the 256-byte stream as such: for 'i' from 0 to 255, S[i] := i
+; DESC:     Completes the following pseudo-code:
+;           ------------------------------------------
+;           for i from 0 to 255
+;               S[i] := i
+;           endfor
+;
+;           j := 0
+;           for i from 0 to 255
+;               j := (j + S[i] + key[i mod keylength]) mod 256
+;               swap values of S[i] and S[j]
+;           endfor
+;           ------------------------------------------
+;
+;           In plain English: Initialize each value in array 'S' to its corresponding index position within 'S'. i.e., S[0] = 0, S[1] = 1, ... S[n] = n
+;                             Then, pseudo-randomly swap values within 'S', using bytes from [KEY].
 ;
 ; RECEIVES: PARAM_3: 32-bit . . .  DWORD [LENGTH]
 ;           PARAM_2: 32-bit OFFSET BYTE  [KEY]
-;           PARAM_1: 32-bit OFFSET BYTE  [KSA]
+;           PARAM_1: 32-bit OFFSET BYTE  [S]
 ; 
-; RETURNS:  PARAM_1: 32-bit OFFSET BYTE [KSA_INITIALIZED]
+; RETURNS:  PARAM_1: 32-bit OFFSET BYTE [S]
 ;
-; PRE-:     [KSA] is a byte array with a length of 256.
+; PRE-:     [S] is a byte array with a length of 256. [KEY] is a byte array with [LENGTH] > 0.
 ;
-; POST-:    [KSA] is initialized as such: for 'i' from 0 to 255, S[i] := i
+; POST-:    [S] is initialized according to the KSA.
 ;
 ; CHANGES:  EAX (restored);     EBX (restored);     ECX (restored);     EDX (restored);     EDI (restored);     ESI (restored);
 ; ---------------------------------------------------------------------
-initializeKSA PROC
-    enter   8, 0
+KSA PROC
+    enter   4, 0
 
     push    eax
     push    ebx
@@ -68,7 +80,7 @@ initializeKSA PROC
 
     mov     eax, 0
     mov     ecx, 256
-    mov     esi, [ebp + 8] ; [KSA]
+    mov     esi, [ebp + 8] ; [S]
 
     initS:
         mov     [esi], al
@@ -78,32 +90,44 @@ initializeKSA PROC
 
     loop    initS
 
-    mov     index_j, 0
     mov     index_i, 0
 
     mov     eax, 0
-    ;mov     ebx, [ebp + 16] ; [LENGTH]
+    mov     ebx, 0          ; EBX will be index 'j'
     mov     ecx, 256
-    mov     esi, [ebp + 8]  ; [KSA]
+    mov     esi, [ebp + 8]  ; [S]
     mov     edi, [ebp + 12] ; [KEY]
 
     initSJ:
-        mov     index_i, 8
-
         push    index_i
-        push    [ebp + 16]
+        push    [ebp + 16]  ; [LENGTH]
         call    quickModulo
-
         ; EDX holds modulo
 
         mov     al, [edi + edx]
 
         add     ebx, index_i
+        add     ebx, eax
 
-        add     index_j, eax
-        
-        inc     esi
-        inc     eax
+        push    ebx
+        push    256
+        call    quickModulo
+
+        mov     ebx, edx
+
+        mov     eax, index_i
+
+        add     esi, ebx    ;
+        push    esi         ; - &j
+        sub     esi, ebx    ;
+
+        add     esi, eax    ;
+        push    esi         ; - &i
+        sub     esi, eax    ;
+
+        call    exchangeElements
+
+        inc     index_i
 
     loop    initSJ
 
@@ -115,8 +139,8 @@ initializeKSA PROC
     pop     eax
 
     leave
-    ret     4
-initializeKSA ENDP
+    ret     12
+KSA ENDP
 
 ; ---------------------------------------------------------------------
 ; NAME:     Encrypt
@@ -183,38 +207,69 @@ Decrypt ENDP
 ;
 ; POST-:    EDX, [MODULO] contains the resulting modulo of [DIVIDEND] & [DIVISOR]
 ;
-; CHANGES:  EAX (restored);     EBX (restored);     EDI (restored);
+; CHANGES:  EAX (restored);     EBX (restored);     EDX;
 ; ---------------------------------------------------------------------
 quickModulo PROC
     enter   0, 0
     
     push    eax
     push    ebx
-    push    edi
 
     mov     eax, [ebp + 12] ; [DIVIDEND]
     mov     ebx, [ebp + 8]  ; [DIVISOR]
-    mov     edi, [ebp + 16] ; [MODULO]
 
     cmp     ebx, 0
-    jle     DivByZero
-
-    cmp     eax, 0
-    jl      SignedDiv
+    je      DivByZero
 
     cdq
 
     div     ebx
 
     DivByZero:
-    SignedDiv:
 
-    pop     edi
     pop     ebx
     pop     eax
 
     leave
-    ret
+    ret     8
 quickModulo ENDP
+
+; ---------------------------------------------------------------------
+; NAME:     exchangeElements
+;
+; DESC:     Swaps two elements in an array.
+;
+; RECEIVES: PARAM_2: 32-bit Memory address of 'j'. (&j)
+;           PARAM_1: 32-bit Memory address of 'i'. (&i)
+; 
+; RETURNS:  None.
+;
+; PRE-:     The elements are of 8-bit size.
+;
+; POST-:    The elements are swapped.
+;
+; CHANGES:  EAX (restored);      EDI (restored);     ESI (restored);
+; ---------------------------------------------------------------------
+exchangeElements PROC 
+    enter   0, 0
+
+    push    eax
+    push    edi
+    push    esi
+
+    mov     esi, [ebp + 12]
+    mov     edi, [ebp + 8]
+
+    mov     al, [esi]
+    xchg    al, [edi]
+    mov     [esi], al
+
+    pop     esi
+    pop     edi
+    pop     eax
+
+    leave
+    ret     8       ; STDCALL
+exchangeElements ENDP
 
 END main
