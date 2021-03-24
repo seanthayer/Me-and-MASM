@@ -2,6 +2,7 @@ TITLE MiniCrypt  (MiniCrypt.asm)
 
 INCLUDE Irvine32.inc
 
+
 index_i EQU DWORD PTR [ebp - 4]
 index_j EQU DWORD PTR [ebp - 8]
 index_k EQU DWORD PTR [ebp - 12]
@@ -9,6 +10,7 @@ index_k EQU DWORD PTR [ebp - 12]
 
 .data
 
+    ; 'S' for stream, or byte stream in this case.
     S           BYTE    256 DUP(0)
 
     key         BYTE    "Secret"
@@ -19,17 +21,19 @@ index_k EQU DWORD PTR [ebp - 12]
 .code
 main PROC
 
-    push    keyLength
-    push    OFFSET key
-    push    OFFSET S
+    push    keyLength   ; [LENGTH]
+    push    OFFSET key  ; [KEY]
+    push    OFFSET S    ; [S]
     call    KSA
 
-    push    OFFSET S
+    push    256         ; [LENGTH]
+    push    OFFSET S    ; [LIST]
     call    sortList
 
     mov     eax, 0
     mov     ecx, 256
     mov     esi, OFFSET S
+
     printLoop:
         mov     al, [esi]
 
@@ -46,68 +50,112 @@ main ENDP
 ; ---------------------------------------------------------------------
 ; NAME:     sortList
 ;
-; DESC:     Selection sort
+; DESC:     Sorts a given byte array in ascending order using a selection sort.
 ;
-; RECEIVES: PARAM_1: Memory address of the array. (&array)
+; RECEIVES: PARAM_2: 32-bit . . .  DWORD [LENGTH]
+;           PARAM_1: 32-bit OFFSET BYTE  [LIST]
 ; 
-; RETURNS:  None.
+; RETURNS:  PARAM_1: 32-bit OFFSET BYTE  [LIST]
 ;
-; PRE-:     
+; PRE-:     [LIST] is a byte array.
 ;
-; POST-:    
+; POST-:    [LIST] is sorted in ascending order.
 ;
-; CHANGES:  
+; CHANGES:  EAX (restored);     EBX (restored);     ECX (restored);     ESI (restored);
 ; ---------------------------------------------------------------------
 sortList PROC 
     enter   12, 0
 
     push    eax
     push    ebx
+    push    ecx
     push    esi
 
     mov     eax, 0
     mov     ebx, 0
-    mov     esi, [ebp + 8]
+    mov     ecx, [ebp + 12] ; [LENGTH]
+    mov     esi, [ebp + 8]  ; [LIST]
 
-    mov     index_i, 0
-    mov     index_j, 0
-    mov     index_k, 0
+    mov     index_i, 0 ; 'i' represents the lower bound of the interval [ i, n ], where 'n' is '[LENGTH] - 1'.
+    mov     index_j, 0 ; 'j' iterates through the array, keeping track of the position of current element.
+    mov     index_k, 0 ; 'k' keeps track of the current selected minimum element.
+
+    ; A selection sort works by selecting the minimum element within a shrinking interval of the full set.
+    ; The pseudo-code for the following implementation is as follows (although 'n' is not explicitly defined):
+    ; -----------------------------------------
+    ;           S := set of variable length
+    ;           n := [LENGTH] - 1
+    ;           i, j, k := 0
+    ;
+    ;           for i from 0 to n
+    ;               k := i
+    ;               
+    ;               for j from i to n
+    ;
+    ;                   if S[j] < S[k]
+    ;                       k := j
+    ;                   
+    ;               endfor
+    ;
+    ;               if k != i
+    ;                   swap S[i] <-> S[k]
+    ;
+    ;           endfor
+    ; -----------------------------------------
+    ;
+    ; That is to say, iterate through the set on the shrinking interval of [ i, n ] with minimum element position starting at 'k := i'.
+    ; Move through set 'S' via 'j', and if a smaller element is found at 'j' position then select it with 'k := j'.
+    ; Finally, if an element besides S[i] was selected, swap S[i] & S[k] and shrink the interval until reaching max index 'n'.
 
     sortLoop:
         add     esi, index_i
-        mov     al, [esi]
+        mov     al, [esi]       ; S[i]
 
         mov     ebx, index_i
-        mov     index_j, ebx
-        mov     index_k, ebx
+        mov     index_k, ebx    ; k := i
+        mov     index_j, ebx    ; j := i (for loop starting val)
 
         subsort:
+
+            ; for j from i to n
+
             inc     index_j
-            cmp     index_j, 256
-            jge     swap     ; When reaching the max limit, swap the selected value.
+            cmp     index_j, ecx ; (j >= [LENGTH]), same as saying, (j on the interval [ i, n ])
+            jge     swap
 
             inc     esi
             mov     bl, [esi]
 
-            cmp     ax, bx
-            jle     subsort
+                                    ; Not quite the same as the pseudo-code but the same in essence. This just words it differently:
+                                    ; -----------------------------------------
+                                    ; where 'ax' is selected minimum value S[k] and 'bx' is value S[j]
+                                    ;
+                                    ; for . . .
+            cmp     ax, bx      ;-- ;
+            jle     subsort     ;-- ;     if S[k] <= S[j]
+                                    ;         continue
+                                    ;     else
+                                    ;         k := j
+                                    ;
+                                    ; endfor
+                                    ; -----------------------------------------
 
-            ; Select lesser value
+            ; else
 
-            mov     al, bl
+            mov     al, bl ; New selected minimum value
 
             mov     ebx, index_j
-            mov     index_k, ebx
+            mov     index_k, ebx ; k := j
 
             jmp     subsort
 
             swap:
-                mov     esi, [ebp + 8]
+                mov     esi, [ebp + 8] ; Reset array position
                 mov     ebx, index_i
-                cmp     index_k, ebx
+                cmp     index_k, ebx   ; Another slight difference from the pseudo-code
                 je      noSort
 
-                ; Swap
+                ; if k != i
 
                 lea     ebx, [esi + ebx]
                 push    ebx
@@ -116,7 +164,7 @@ sortList PROC
                 lea     ebx, [esi + ebx]
                 push    ebx
 
-                call    exchangeElements
+                call    exchangeElements ; swap S[i] <-> S[k]
 
             noSort:
                 ; --------------
@@ -131,11 +179,12 @@ sortList PROC
         ; --------------
 
     pop     esi
+    pop     ecx
     pop     ebx
     pop     eax
 
     leave
-    ret     4
+    ret     8
 sortList ENDP
 
 ; ---------------------------------------------------------------------
@@ -154,8 +203,8 @@ sortList ENDP
 ;           endfor
 ;           ------------------------------------------
 ;
-;           In plain English: Initialize each value in array 'S' to its corresponding index position within 'S'. i.e., S[0] = 0, S[1] = 1, ... S[n] = n
-;                             Then, pseudo-randomly swap values within 'S', using bytes from [KEY].
+;           This sets the value of each index in 'S' to its position within 'S'.  i.e., S[0] = 0, S[1] = 1, ... S[n] = n
+;           Then, values are pseudo-randomly swapped within 'S', using bytes from [KEY] to seed.
 ;
 ; RECEIVES: PARAM_3: 32-bit . . .  DWORD [LENGTH]
 ;           PARAM_2: 32-bit OFFSET BYTE  [KEY]
@@ -184,7 +233,10 @@ KSA PROC
     mov     esi, [ebp + 8] ; [S]
 
     initS:
-        mov     [esi], al
+
+        ; for i from 0 to 255
+
+        mov     [esi], al ; S[i] := i
 
         inc     esi
         inc     al
@@ -200,6 +252,9 @@ KSA PROC
     mov     edi, [ebp + 12] ; [KEY]
 
     initS2:
+
+        ; for i from 0 to 255
+
         push    index_i
         push    [ebp + 16]  ; [LENGTH]
         call    quickModulo
@@ -218,7 +273,7 @@ KSA PROC
         push    256
         call    quickModulo
 
-        mov     ebx, edx
+        mov     ebx, edx    ; j := (j + S[i] + key[i mod keylength]) mod 256
 
         mov     eax, index_i
 
@@ -230,7 +285,7 @@ KSA PROC
         push    esi         ; - &i
         sub     esi, eax    ;
 
-        call    exchangeElements
+        call    exchangeElements ; swap S[i] <-> S[j]
 
         inc     index_i
 
@@ -301,16 +356,16 @@ Decrypt ENDP
 ; DESC:     Calculates the modulo of two unsigned 32-bit values and stores the result
 ;           in the 32-bit EDX register.
 ;
-; RECEIVES: PARAM_3: 32-bit REG.   EDX   [MODULO]
+; RECEIVES: PARAM_3: REGISTER      EDX   [MODULO]
 ;           PARAM_2: 32-bit . . .  DWORD [DIVIDEND]
 ;           PARAM_1: 32-bit . . .  DWORD [DIVISOR]
 ; 
-; RETURNS:  PARAM_3: 32-bit REG.   EDX   [MODULO]
+; RETURNS:  PARAM_3: REGISTER      EDX   [MODULO]
 ;
-; PRE-:     The divisor is not 0, and the divisor & dividend are 32-bit parameters
-;           passed by value, and not signed. The 32-bit EDX register has no important data.
+; PRE-:     The divisor is not 0, and the divisor & dividend are unsigned 32-bit parameters
+;           passed by value. The 32-bit EDX register will be overwritten with the resulting modulo.
 ;
-; POST-:    EDX, [MODULO] contains the resulting modulo of [DIVIDEND] & [DIVISOR]
+; POST-:    EDX contains [MODULO] of [DIVIDEND] & [DIVISOR]
 ;
 ; CHANGES:  EAX (restored);     EBX (restored);     EDX;
 ; ---------------------------------------------------------------------
