@@ -77,13 +77,13 @@ sortList PROC
     mov     esi, [ebp + 8]  ; [LIST]
 
     mov     index_i, 0 ; 'i' represents the lower bound of the interval [ i, n ], where 'n' is '[LENGTH] - 1'.
-    mov     index_j, 0 ; 'j' iterates through the array, keeping track of the position of current element.
+    mov     index_j, 0 ; 'j' iterates through the array, keeping track of the position of the current element.
     mov     index_k, 0 ; 'k' keeps track of the current selected minimum element.
 
-    ; A selection sort works by selecting the minimum element within a shrinking interval of the full set.
+    ; A selection sort works by selecting the minimum element within a shrinking sub-set of the main set, and moving that element to the beginning of the sub-set.
     ; The pseudo-code for the following implementation is as follows (although 'n' is not explicitly defined):
     ; -----------------------------------------
-    ;           S := set of variable length
+    ;           S := A set with 'length = [LENGTH]'
     ;           n := [LENGTH] - 1
     ;           i, j, k := 0
     ;
@@ -103,17 +103,20 @@ sortList PROC
     ;           endfor
     ; -----------------------------------------
     ;
-    ; That is to say, iterate through the set on the shrinking interval of [ i, n ] with minimum element position starting at 'k := i'.
-    ; Move through set 'S' via 'j', and if a smaller element is found at 'j' position then select it with 'k := j'.
-    ; Finally, if an element besides S[i] was selected, swap S[i] & S[k] and shrink the interval until reaching max index 'n'.
+    ; That is to say, iterate through 'S' on the interval [ 0, n ] using 'i', with each minimum element position starting at 'i'. 'k := i'.
+    ; Then, iterate through 'S' on the sub-interval [ i, n ] using 'j', and if an element at S[j] is smaller than the current minimum element S[k], select it. 'k := j'.
+    ; Finally, if an element smaller than S[i] was found, swap it with S[k] and continue.
 
     sortLoop:
+    
+        ; for i from 0 to n
+    
         add     esi, index_i
         mov     al, [esi]       ; S[i]
 
         mov     ebx, index_i
         mov     index_k, ebx    ; k := i
-        mov     index_j, ebx    ; j := i (for loop starting val)
+        mov     index_j, ebx    ; j := i 
 
         subsort:
 
@@ -170,7 +173,7 @@ sortList PROC
                 ; --------------
 
         inc     index_i
-        cmp     index_i, 256
+        cmp     index_i, ecx ; (i >= [LENGTH]), so 'i' up to 'n'.
         jge     sortFinish
 
     jmp     sortLoop
