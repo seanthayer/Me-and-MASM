@@ -3,6 +3,9 @@ TITLE MiniCrypt  (MiniCrypt.asm)
 INCLUDE Irvine32.inc
 
 index_i EQU DWORD PTR [ebp - 4]
+index_j EQU DWORD PTR [ebp - 8]
+index_k EQU DWORD PTR [ebp - 12]
+
 
 .data
 
@@ -21,6 +24,9 @@ main PROC
     push    OFFSET S
     call    KSA
 
+    push    OFFSET S
+    call    sortList
+
     mov     eax, 0
     mov     ecx, 256
     mov     esi, OFFSET S
@@ -36,6 +42,101 @@ main PROC
 
 	exit
 main ENDP
+
+; ---------------------------------------------------------------------
+; NAME:     sortList
+;
+; DESC:     Selection sort
+;
+; RECEIVES: PARAM_1: Memory address of the array. (&array)
+; 
+; RETURNS:  None.
+;
+; PRE-:     
+;
+; POST-:    
+;
+; CHANGES:  
+; ---------------------------------------------------------------------
+sortList PROC 
+    enter   12, 0
+
+    push    eax
+    push    ebx
+    push    esi
+
+    mov     eax, 0
+    mov     ebx, 0
+    mov     esi, [ebp + 8]
+
+    mov     index_i, 0
+    mov     index_j, 0
+    mov     index_k, 0
+
+    sortLoop:
+        add     esi, index_i
+        mov     al, [esi]
+
+        mov     ebx, index_i
+        mov     index_j, ebx
+        mov     index_k, ebx
+
+        subsort:
+            inc     index_j
+            cmp     index_j, 256
+            jge     swap     ; When reaching the max limit, swap the selected value.
+
+            inc     esi
+            mov     bl, [esi]
+
+            cmp     ax, bx
+            jle     subsort
+
+            ; Select lesser value
+
+            mov     al, bl
+
+            mov     ebx, index_j
+            mov     index_k, ebx
+
+            jmp     subsort
+
+            swap:
+                mov     esi, [ebp + 8]
+                mov     ebx, index_i
+                cmp     index_k, ebx
+                je      noSort
+
+                ; Swap
+
+                lea     ebx, [esi + ebx]
+                push    ebx
+
+                mov     ebx, index_k
+                lea     ebx, [esi + ebx]
+                push    ebx
+
+                call    exchangeElements
+
+            noSort:
+                ; --------------
+
+        inc     index_i
+        cmp     index_i, 256
+        jge     sortFinish
+
+    jmp     sortLoop
+
+    sortFinish:
+        ; --------------
+
+    pop     esi
+    pop     ebx
+    pop     eax
+
+    leave
+    ret     4
+sortList ENDP
 
 ; ---------------------------------------------------------------------
 ; NAME:     KSA (Key-scheduling algorithm)
