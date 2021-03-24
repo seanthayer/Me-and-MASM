@@ -98,15 +98,19 @@ KSA PROC
     mov     esi, [ebp + 8]  ; [S]
     mov     edi, [ebp + 12] ; [KEY]
 
-    initSJ:
+    initS2:
         push    index_i
         push    [ebp + 16]  ; [LENGTH]
         call    quickModulo
         ; EDX holds modulo
 
-        mov     al, [edi + edx]
+        mov     al, [edi + edx] ; Get byte value from modulo position in [KEY]
 
-        add     ebx, index_i
+        add     ebx, eax
+
+        mov     edx, index_i
+        mov     al, [esi + edx] ; S[i]
+
         add     ebx, eax
 
         push    ebx
@@ -129,7 +133,7 @@ KSA PROC
 
         inc     index_i
 
-    loop    initSJ
+    loop    initS2
 
     pop     esi
     pop     edi
