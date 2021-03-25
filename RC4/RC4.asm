@@ -1,4 +1,4 @@
-TITLE MiniCrypt  (MiniCrypt.asm)
+TITLE Rivest Cipher 4 (RC4.asm)
 
 INCLUDE Irvine32.inc
 
@@ -26,10 +26,6 @@ main PROC
     push    OFFSET S    ; [S]
     call    KSA
 
-    push    256         ; [LENGTH]
-    push    OFFSET S    ; [LIST]
-    call    sortList
-
     mov     eax, 0
     mov     ecx, 256
     mov     esi, OFFSET S
@@ -46,149 +42,6 @@ main PROC
 
 	exit
 main ENDP
-
-; ---------------------------------------------------------------------
-; NAME:     sortList
-;
-; DESC:     Sorts a given byte array in ascending order using a selection sort.
-;
-; RECEIVES: PARAM_2: 32-bit . . .  DWORD [LENGTH]
-;           PARAM_1: 32-bit OFFSET BYTE  [LIST]
-; 
-; RETURNS:  PARAM_1: 32-bit OFFSET BYTE  [LIST]
-;
-; PRE-:     [LIST] is a byte array.
-;
-; POST-:    [LIST] is sorted in ascending order.
-;
-; CHANGES:  EAX (restored);     EBX (restored);     ECX (restored);     ESI (restored);
-; ---------------------------------------------------------------------
-sortList PROC 
-    enter   12, 0
-
-    push    eax
-    push    ebx
-    push    ecx
-    push    esi
-
-    mov     eax, 0
-    mov     ebx, 0
-    mov     ecx, [ebp + 12] ; [LENGTH]
-    mov     esi, [ebp + 8]  ; [LIST]
-
-    mov     index_i, 0 ; 'i' represents the lower bound of the interval [ i, n ], where 'n' is '[LENGTH] - 1'.
-    mov     index_j, 0 ; 'j' iterates through the array, keeping track of the position of the current element.
-    mov     index_k, 0 ; 'k' keeps track of the current selected minimum element.
-
-    ; A selection sort works by selecting the minimum element within a shrinking sub-set of the main set, and moving that element to the beginning of the sub-set.
-    ; The pseudo-code for the following implementation is as follows (although 'n' is not explicitly defined):
-    ; -----------------------------------------
-    ;           S := A set with 'length = [LENGTH]'
-    ;           n := [LENGTH] - 1
-    ;           i, j, k := 0
-    ;
-    ;           for i from 0 to n
-    ;               k := i
-    ;               
-    ;               for j from i to n
-    ;
-    ;                   if S[j] < S[k]
-    ;                       k := j
-    ;                   
-    ;               endfor
-    ;
-    ;               if k != i
-    ;                   swap S[i] <-> S[k]
-    ;
-    ;           endfor
-    ; -----------------------------------------
-    ;
-    ; That is to say, iterate through 'S' on the interval [ 0, n ] using 'i', with each minimum element position starting at 'i'. 'k := i'.
-    ; Then, iterate through 'S' on the sub-interval [ i, n ] using 'j', and if an element at S[j] is smaller than the current minimum element S[k], select it. 'k := j'.
-    ; Finally, if an element smaller than S[i] was found, swap it with S[k] and continue.
-
-    sortLoop:
-    
-        ; for i from 0 to n
-    
-        add     esi, index_i
-        mov     al, [esi]       ; S[i]
-
-        mov     ebx, index_i
-        mov     index_k, ebx    ; k := i
-        mov     index_j, ebx    ; j := i 
-
-        subsort:
-
-            ; for j from i to n
-
-            inc     index_j
-            cmp     index_j, ecx ; (j >= [LENGTH]), same as saying, (j on the interval [ i, n ])
-            jge     swap
-
-            inc     esi
-            mov     bl, [esi]
-
-                                    ; Not quite the same as the pseudo-code but the same in essence. This just words it differently:
-                                    ; -----------------------------------------
-                                    ; where 'ax' is selected minimum value S[k] and 'bx' is value S[j]
-                                    ;
-                                    ; for . . .
-            cmp     ax, bx      ;-- ;
-            jle     subsort     ;-- ;     if S[k] <= S[j]
-                                    ;         continue
-                                    ;     else
-                                    ;         k := j
-                                    ;
-                                    ; endfor
-                                    ; -----------------------------------------
-
-            ; else
-
-            mov     al, bl ; New selected minimum value
-
-            mov     ebx, index_j
-            mov     index_k, ebx ; k := j
-
-            jmp     subsort
-
-            swap:
-                mov     esi, [ebp + 8] ; Reset array position
-                mov     ebx, index_i
-                cmp     index_k, ebx   ; Another slight difference from the pseudo-code
-                je      noSort
-
-                ; if k != i
-
-                lea     ebx, [esi + ebx]
-                push    ebx
-
-                mov     ebx, index_k
-                lea     ebx, [esi + ebx]
-                push    ebx
-
-                call    exchangeElements ; swap S[i] <-> S[k]
-
-            noSort:
-                ; --------------
-
-        inc     index_i
-        cmp     index_i, ecx ; (i >= [LENGTH]), so 'i' up to 'n'.
-        jge     sortFinish
-
-    jmp     sortLoop
-
-    sortFinish:
-        ; --------------
-
-    pop     esi
-    pop     ecx
-    pop     ebx
-    pop     eax
-
-    leave
-    ret     8
-sortList ENDP
 
 ; ---------------------------------------------------------------------
 ; NAME:     KSA (Key-scheduling algorithm)
