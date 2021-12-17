@@ -7,19 +7,19 @@ index_i EQU DWORD PTR [ebp - 4]
 index_j EQU DWORD PTR [ebp - 8]
 index_k EQU DWORD PTR [ebp - 12]
 
+N = 15000
+
 LO = 1
 HI = 255
 
 
 .data
 
-    S           BYTE    600 DUP(0)
-    S_Length    DWORD   600
+    S           BYTE    N DUP(0)
+    S_Length    DWORD   N
 
     break       BYTE    "-----------------------------------------", 0
 
-    test1       BYTE    "Found a new minimum value: ", 0
-    test2       BYTE    "At position: ", 0
 
 .code
 main PROC
@@ -38,7 +38,18 @@ main PROC
         mov     al, [esi]
 
         call    WriteDec
+
+        mov     al, 9
+        call    WriteChar
+
+        push    ecx
+        push    15
+        call    quickModulo
+
+        cmp     edx, 1
+        jne     no_break
         call    Crlf
+        no_break:
 
         inc     esi
 
@@ -64,7 +75,18 @@ main PROC
         mov     al, [esi]
 
         call    WriteDec
+
+        mov     al, 9
+        call    WriteChar
+
+        push    ecx
+        push    15
+        call    quickModulo
+
+        cmp     edx, 1
+        jne     no_break2
         call    Crlf
+        no_break2:
 
         inc     esi
 
@@ -184,8 +206,6 @@ sortList PROC
     sortLoop:
     
         ; for i from 0 to n
-        call    WriteDec
-        call    Crlf
     
         add     esi, index_i
         mov     al, [esi]       ; S[i]
@@ -227,18 +247,6 @@ sortList PROC
             mov     ebx, index_j
             mov     index_k, ebx ; k := j
 
-            ;mov     edx, OFFSET test1
-            ;call    WriteString
-            ;call    WriteDec
-            ;call    Crlf
-            ;mov     edx, OFFSET test2
-            ;call    WriteString
-            ;push    eax
-            ;mov     eax, ebx
-            ;call    WriteDec
-            ;pop     eax
-            ;call    Crlf
-
             jmp     subsort
 
             swap:
@@ -278,6 +286,50 @@ sortList PROC
     leave
     ret     8
 sortList ENDP
+
+; ---------------------------------------------------------------------
+; NAME:     quickModulo
+;
+; DESC:     Calculates the modulo of two unsigned 32-bit values and stores the result
+;           in the 32-bit EDX register.
+;
+; RECEIVES: PARAM_3: REGISTER      EDX   [MODULO]
+;           PARAM_2: 32-bit . . .  DWORD [DIVIDEND]
+;           PARAM_1: 32-bit . . .  DWORD [DIVISOR]
+; 
+; RETURNS:  PARAM_3: REGISTER      EDX   [MODULO]
+;
+; PRE-:     The divisor is not 0, and the divisor & dividend are unsigned 32-bit parameters
+;           passed by value. The 32-bit EDX register will be overwritten with the resulting modulo.
+;
+; POST-:    EDX contains [MODULO] of [DIVIDEND] & [DIVISOR]
+;
+; CHANGES:  EAX (restored);     EBX (restored);     EDX;
+; ---------------------------------------------------------------------
+quickModulo PROC
+    enter   0, 0
+    
+    push    eax
+    push    ebx
+
+    mov     eax, [ebp + 12] ; [DIVIDEND]
+    mov     ebx, [ebp + 8]  ; [DIVISOR]
+
+    cmp     ebx, 0
+    je      DivByZero
+
+    cdq
+
+    div     ebx
+
+    DivByZero:
+
+    pop     ebx
+    pop     eax
+
+    leave
+    ret     8
+quickModulo ENDP
 
 ; ---------------------------------------------------------------------
 ; NAME:     exchangeElements
