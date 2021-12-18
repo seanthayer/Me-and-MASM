@@ -18,15 +18,16 @@ index_l EQU DWORD PTR [ebp - 12]
 
     S           BYTE    256 DUP(0)
     key         BYTE    "Wiki"
-
     message     BYTE    "pedia", 0
 
     CIPHER_KEY  BYTE    MESSAGE_LENGTH DUP(0)
-    CIPHER      BYTE    MESSAGE_LENGTH DUP(0)
 
-    decipherMsg BYTE    MESSAGE_LENGTH DUP(0)
+    CIPHER_MSG  BYTE    MESSAGE_LENGTH DUP(0)
+    DECPHER_MSG BYTE    MESSAGE_LENGTH DUP(0)
 
     ; ----- PROMPTS -----
+
+    break       BYTE    "-----------------------------------------", 0
 
     msgKeyLngth BYTE    "Calling KSA with key length of: ", 0
     msgKey      BYTE    "Corresponding to a key of: ", 0
@@ -39,23 +40,27 @@ index_l EQU DWORD PTR [ebp - 12]
     msgCpher    BYTE    "PRGA returned a cipher of: ", 0
     msgCpherK   BYTE    "With a cipher key of: ", 0
 
-    msgDecpher  BYTE    "Calling DECIPHER with CIPHER and CIPHER_KEY.", 0
-    msgDcphrDne BYTE    "DECIPHER complete.", 0
-    msgDcphrMsg BYTE    "DECIPHER returned a message of: ", 0
+    msgDcKSA    BYTE    "Calling KSA with original key to reset S.", 0
+    msgDecpher  BYTE    "Calling PRGA with CIPHER.", 0
 
 .code
 main PROC
 
-    ; ----- KSA PROMPTS -----
 
-    mov     edx, OFFSET msgKeyLngth
+    ; ---------- KSA PROMPTS ----------
+
+
+    mov     edx, OFFSET msgKeyLngth ; "Calling KSA with key length of: "
     call    WriteString
+
     mov     eax, KEY_LENGTH
     call    WriteDec
+
     call    Crlf
 
-    mov     edx, OFFSET msgKey
+    mov     edx, OFFSET msgKey ; "Corresponding to a key of: "
     call    WriteString
+
     mov     eax, 0
     mov     ecx, KEY_LENGTH
     mov     esi, OFFSET key
@@ -63,6 +68,7 @@ main PROC
     Key_Print:
         mov     al, [esi]
         call    WriteHex
+
         mov     al, " "
         call    WriteChar
 
@@ -70,7 +76,12 @@ main PROC
 
     loop Key_Print
 
-    ; --------------------
+
+    call    Crlf
+    call    Crlf
+
+
+    ; ---------- KSA ----------
 
 
     push    KEY_LENGTH  ; [LENGTH]
@@ -79,23 +90,36 @@ main PROC
     call    KSA
 
 
-    ; ----- PRGA PROMPTS -----
+    ; -------------------------
+
+
+    mov     edx, OFFSET msgKSADone ; "KSA complete."
+    call    WriteString
 
     call    Crlf
     call    Crlf
-    mov     edx, OFFSET msgKSADone
+
+    mov     edx, OFFSET break
     call    WriteString
+
     call    Crlf
     call    Crlf
 
-    mov     edx, OFFSET msgMsgLngth
+
+    ; ---------- PRGA PROMPTS ----------
+
+
+    mov     edx, OFFSET msgMsgLngth ; "Calling PRGA with a message length of (including terminating char): "
     call    WriteString
+
     mov     eax, MESSAGE_LENGTH
     call    WriteDec
+
     call    Crlf
 
-    mov     edx, OFFSET msgMsg
+    mov     edx, OFFSET msgMsg ; "Corresponding to a message of: "
     call    WriteString
+
     mov     eax, 0
     mov     esi, OFFSET message
 
@@ -105,6 +129,7 @@ main PROC
         je      MessageHex_PrintDone
 
         call    WriteHex
+
         mov     al, " "
         call    WriteChar
 
@@ -114,37 +139,55 @@ main PROC
 
     MessageHex_PrintDone:
 
-    mov     eax, 0
+
     mov     al, "("
     call    WriteChar
+
     mov     edx, OFFSET message
     call    WriteString
+
     mov     al, ")"
     call    WriteChar
 
-    ; --------------------
+
+    call    Crlf
+    call    Crlf
+
+
+    ; ---------- PRGA ----------
 
 
     push    OFFSET S            ; [S]
     push    OFFSET message      ; [MESSAGE]
     push    OFFSET CIPHER_KEY   ; [CIPHER_KEY]
-    push    OFFSET CIPHER       ; [CIPHER]
+    push    OFFSET CIPHER_MSG   ; [CIPHER_MSG]
     call    PRGA
 
 
-    ; ----- CIPHER PROMPTS -----
+    ; --------------------------
+
+
+    mov     edx, OFFSET msgPRGADone ; "PRGA complete."
+    call    WriteString
 
     call    Crlf
     call    Crlf
-    mov     edx, OFFSET msgPRGADone
+
+    mov     edx, OFFSET break
     call    WriteString
+
     call    Crlf
     call    Crlf
 
-    mov     edx, OFFSET msgCpher
+
+    ; ---------- CIPHER PROMPTS ----------
+
+
+    mov     edx, OFFSET msgCpher ; "PRGA returned a cipher of: "
     call    WriteString
+
     mov     eax, 0
-    mov     esi, OFFSET CIPHER
+    mov     esi, OFFSET CIPHER_MSG
 
     Cipher_Print:
         mov     al, [esi]
@@ -152,6 +195,7 @@ main PROC
         je      Cipher_PrintDone
 
         call    WriteHex
+
         mov     al, " "
         call    WriteChar
 
@@ -161,9 +205,23 @@ main PROC
 
     Cipher_PrintDone:
 
-    call    Crlf
-    mov     edx, OFFSET msgCpherK
+
+    mov     al, "("
+    call    WriteChar
+
+    mov     edx, OFFSET CIPHER_MSG
     call    WriteString
+
+    mov     al, ")"
+    call    WriteChar
+
+
+    call    Crlf
+
+
+    mov     edx, OFFSET msgCpherK ; "With a cipher key of: "
+    call    WriteString
+
     mov     eax, 0
     mov     esi, OFFSET CIPHER_KEY
 
@@ -173,6 +231,7 @@ main PROC
         je      CipherKey_PrintDone
 
         call    WriteHex
+
         mov     al, " "
         call    WriteChar
 
@@ -183,33 +242,172 @@ main PROC
     CipherKey_PrintDone:
 
 
-    call    Crlf
-    call    Crlf
-    mov     edx, OFFSET msgDecpher
-    call    WriteString
+    ; ------------------------------------
 
-    ; --------------------
-
-
-    push    OFFSET CIPHER_KEY   ; [CIPHER_KEY]
-    push    OFFSET CIPHER       ; [CIPHER]
-    push    OFFSET decipherMsg  ; [MESSAGE]
-    call    DECIPHER
-
-
-    ; ----- DECIPHER PROMPTS -----
 
     call    Crlf
     call    Crlf
-    mov     edx, OFFSET msgDcphrDne
+
+    mov     edx, OFFSET break
     call    WriteString
 
     call    Crlf
     call    Crlf
-    mov     edx, OFFSET msgDcphrMsg
+
+
+    ; ---------- DECIPHER START PROMPTS ----------
+
+
+    mov     edx, OFFSET msgDcKSA ; "Calling KSA with original key to reset S."
     call    WriteString
+
+    call    Crlf
+    call    Crlf
+
+    mov     edx, OFFSET msgKeyLngth ; "Calling KSA with key length of: "
+    call    WriteString
+
+    mov     eax, KEY_LENGTH
+    call    WriteDec
+
+    call    Crlf
+
+    mov     edx, OFFSET msgKey ; "Corresponding to a key of: "
+    call    WriteString
+
     mov     eax, 0
-    mov     esi, OFFSET decipherMsg
+    mov     ecx, KEY_LENGTH
+    mov     esi, OFFSET key
+
+    Key_Print2:
+        mov     al, [esi]
+        call    WriteHex
+
+        mov     al, " "
+        call    WriteChar
+
+        inc     esi
+
+    loop Key_Print2
+
+
+    call    Crlf
+    call    Crlf
+
+
+    ; ---------- KSA ----------
+
+
+    push    KEY_LENGTH  ; [LENGTH]
+    push    OFFSET key  ; [KEY]
+    push    OFFSET S    ; [S]
+    call    KSA
+
+
+    ; -------------------------
+
+
+    mov     edx, OFFSET msgKSADone ; "KSA complete."
+    call    WriteString
+
+    call    Crlf
+    call    Crlf
+
+    mov     edx, OFFSET break
+    call    WriteString
+
+    call    Crlf
+    call    Crlf
+
+
+    ; ---------- DECIPHER PRGA PROMPTS ----------
+
+
+    mov     edx, OFFSET msgDecpher ; "Calling PRGA with CIPHER."
+    call    WriteString
+
+    call    Crlf
+    call    Crlf
+
+    mov     edx, OFFSET msgMsgLngth ; "Calling PRGA with a message length of (including terminating char): "
+    call    WriteString
+
+    mov     eax, MESSAGE_LENGTH
+    call    WriteDec
+
+    call    Crlf
+
+    mov     edx, OFFSET msgMsg ; "Corresponding to a message of: "
+    call    WriteString
+
+    mov     eax, 0
+    mov     esi, OFFSET CIPHER_MSG
+
+    MessageHex_Print2:
+        mov     al, [esi]
+        cmp     al, 0
+        je      MessageHex_PrintDone2
+
+        call    WriteHex
+
+        mov     al, " "
+        call    WriteChar
+
+        inc     esi
+        
+    jmp     MessageHex_Print2
+
+    MessageHex_PrintDone2:
+
+
+    mov     al, "("
+    call    WriteChar
+
+    mov     edx, OFFSET CIPHER_MSG
+    call    WriteString
+
+    mov     al, ")"
+    call    WriteChar
+
+
+    call    Crlf
+    call    Crlf
+
+
+    ; ---------- PRGA ----------
+
+
+    push    OFFSET S            ; [S]
+    push    OFFSET CIPHER_MSG   ; [MESSAGE]
+    push    OFFSET CIPHER_KEY   ; [CIPHER_KEY]
+    push    OFFSET DECPHER_MSG  ; [CIPHER_MSG]
+    call    PRGA
+
+
+    ; --------------------------
+
+
+    mov     edx, OFFSET msgPRGADone ; "PRGA complete."
+    call    WriteString
+
+    call    Crlf
+    call    Crlf
+
+    mov     edx, OFFSET break
+    call    WriteString
+
+    call    Crlf
+    call    Crlf
+
+
+    ; ---------- DECIPHER DONE PROMPTS ----------
+
+
+    mov     edx, OFFSET msgCpher ; "PRGA returned a cipher of: "
+    call    WriteString
+
+    mov     eax, 0
+    mov     esi, OFFSET DECPHER_MSG
 
     DecipherHex_Print:
         mov     al, [esi]
@@ -217,6 +415,7 @@ main PROC
         je      DecipherHex_PrintDone
 
         call    WriteHex
+
         mov     al, " "
         call    WriteChar
 
@@ -226,19 +425,51 @@ main PROC
 
     DecipherHex_PrintDone:
 
-    mov     eax, 0
+
     mov     al, "("
     call    WriteChar
-    mov     edx, OFFSET decipherMsg
+
+    mov     edx, OFFSET DECPHER_MSG
     call    WriteString
+
     mov     al, ")"
     call    WriteChar
+
+
     call    Crlf
 
-    ; --------------------
+
+    mov     edx, OFFSET msgCpherK ; "With a cipher key of: "
+    call    WriteString
+
+    mov     eax, 0
+    mov     esi, OFFSET CIPHER_KEY
+
+    CipherKey_Print2:
+        mov     al, [esi]
+        cmp     al, 0
+        je      CipherKey_PrintDone2
+
+        call    WriteHex
+
+        mov     al, " "
+        call    WriteChar
+
+        inc     esi
+        
+    jmp     CipherKey_Print2
+
+    CipherKey_PrintDone2:
 
 
-	exit
+    call    Crlf
+    call    Crlf
+
+
+    ; -------------------------------------------
+
+
+	INVOKE  ExitProcess, 0
 main ENDP
 
 ; ---------------------------------------------------------------------
@@ -385,15 +616,15 @@ KSA ENDP
 ; RECEIVES: PARAM_4: 32-bit OFFSET BYTE  [S]
 ;           PARAM_3: 32-bit OFFSET BYTE  [MESSAGE]
 ;           PARAM_2: 32-bit OFFSET BYTE  [CIPHER_KEY]
-;           PARAM_1: 32-bit OFFSET BYTE  [CIPHER]
+;           PARAM_1: 32-bit OFFSET BYTE  [CIPHER_MSG]
 ; 
 ; RETURNS:  PARAM_2: 32-bit OFFSET BYTE  [CIPHER_KEY]
-;           PARAM_1: 32-bit OFFSET BYTE  [CIPHER]
+;           PARAM_1: 32-bit OFFSET BYTE  [CIPHER_MSG]
 ;
 ; PRE-:     Parameters are byte arrays. [S] has been initialized using the Key-scheduling algorithm.
 ;
 ; POST-:    [CIPHER_KEY] contains the [S] values used for the XOR at 'i' position.
-;           [CIPHER] contains the encrypted values.
+;           [CIPHER_MSG] contains the encrypted values.
 ;
 ; CHANGES:  EAX (restored);     EBX (restored);     ECX (restored);     EDX (restored);     EDI (restored);     ESI (restored);
 ; ---------------------------------------------------------------------
@@ -409,7 +640,7 @@ PRGA PROC
 
 
     mov     eax, 0
-    mov     ecx, [ebp + 8]  ; [CIPHER]
+    mov     ecx, [ebp + 8]  ; [CIPHER_MSG]
     mov     edx, 0
     mov     edi, [ebp + 20] ; [S]
     mov     esi, [ebp + 16] ; [MESSAGE]
@@ -503,68 +734,6 @@ PRGA PROC
     leave
     ret     16
 PRGA ENDP
-
-; ---------------------------------------------------------------------
-; NAME:     DECIPHER
-;
-; DESC:     Reverses the bitwise XOR operation for a [CIPHER] with its given [CIPHER_KEY].
-;           Returns the cipher's original message.
-;
-; RECEIVES: PARAM_3: 32-bit OFFSET BYTE  [CIPHER_KEY]
-;           PARAM_2: 32-bit OFFSET BYTE  [CIPHER]
-;           PARAM_1: 32-bit OFFSET BYTE  [MESSAGE]
-; 
-; RETURNS:  PARAM_1: 32-bit OFFSET BYTE  [MESSAGE]
-;
-; PRE-:     [CIPHER_KEY] contains the key values used to XOR each character in [CIPHER] at each 'i' position.
-;           [CIPHER] contains the values resulting from a bitwise XOR using [CIPHER_KEY] and the original message.
-;
-; POST-:    [MESSAGE] contains the deciphered message.
-;
-; CHANGES:  EAX (restored);     EBX (restored);     ECX (restored);     EDI (restored);     ESI (restored);
-; ---------------------------------------------------------------------
-DECIPHER PROC
-    enter   0, 0
-
-    push    eax
-    push    ebx
-    push    ecx
-    push    edi
-    push    esi
-
-    mov     eax, 0
-    mov     ebx, 0
-    mov     ecx, [ebp + 8]  ; [MESSAGE]
-    mov     edi, [ebp + 12] ; [CIPHER]
-    mov     esi, [ebp + 16] ; [CIPHER_KEY]
-
-    Decipher_Loop:
-        mov     bl, [edi]
-        cmp     bl, 0
-        je      Decipher_Done
-
-        mov     al, [esi]
-        mov     [ecx], al
-
-        xor     [ecx], bl
-
-        inc     ecx
-        inc     edi
-        inc     esi
-
-    jmp     Decipher_Loop
-
-    Decipher_Done:
-
-    pop     esi
-    pop     edi
-    pop     ecx
-    pop     ebx
-    pop     eax
-
-    leave
-    ret     12
-DECIPHER ENDP
 
 ; ---------------------------------------------------------------------
 ; NAME:     quickModulo
