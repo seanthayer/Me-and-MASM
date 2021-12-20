@@ -20,9 +20,12 @@ HI = 255
 
 INF = -1
 
+ASCII_TAB = 9
+
 ; TO-DO:    - Fix bug:  as 'N' approaches large values, elements at the end
 ;                       of 'S' are overwritten and mis-sorted with higher frequency.
 ;                       Bad memory addressing?
+
 
 .data
 
@@ -47,20 +50,28 @@ main PROC
 
     call    Randomize
 
+
+    ; ---------- FILL ----------
+
+
     push    S_Length    ; [LENGTH]
     push    OFFSET S    ; [ARRAY]
     call    fillArray
 
+
+    ; --------------------------
+
+
     mov     eax, 0
     mov     ecx, S_Length
     mov     esi, OFFSET S
 
-    print:
+    Print_Unsorted:
         mov     al, [esi]
 
         call    WriteDec
 
-        mov     al, 9
+        mov     al, ASCII_TAB
         call    WriteChar
 
         push    ecx
@@ -68,68 +79,96 @@ main PROC
         call    quickModulo
 
         cmp     edx, 1
-        jne     no_break
+        jne     No_Break_Uns
+
         call    Crlf
-        no_break:
+
+        No_Break_Uns:
 
         inc     esi
 
-    loop    print
+    loop    Print_Unsorted
 
-    call    Crlf
 
-    multiSort:
+    ; --------------------------
 
-    cmp     sortTimes, 0
-    jle     quit
 
-    mov     eax, S_Length
-    dec     eax
+    Sort_N_Times:
 
-    push    eax         ; [INDEX_R]
-    push    0           ; [INDEX_P]
-    push    OFFSET S    ; [ARRAY]
-    call    mergeSort
+        cmp     sortTimes, 0
+        jle     quit
 
-    mov     edx, OFFSET break
-    call    Crlf
-    call    WriteString
-    call    Crlf
-    call    Crlf
 
-    mov     eax, 0
-    mov     ecx, S_Length
-    mov     esi, OFFSET S
+        ; ---------- MERGE SORT ----------
 
-    printSorted:
-        mov     al, [esi]
 
-        call    WriteDec
+        mov     eax, S_Length
+        dec     eax
 
-        mov     al, 9
-        call    WriteChar
+        push    eax         ; [INDEX_R]
+        push    0           ; [INDEX_P]
+        push    OFFSET S    ; [ARRAY]
+        call    mergeSort
 
-        push    ecx
-        push    15
-        call    quickModulo
 
-        cmp     edx, 1
-        jne     no_break2
+        ; --------------------------------
+
+
         call    Crlf
-        no_break2:
+        call    Crlf
 
-        inc     esi
-        inc     ebx
+        mov     edx, OFFSET break
+        call    WriteString
 
-    loop    printSorted
+        call    Crlf
+        call    Crlf
+
+
+        ; --------------------------------
+
+
+        mov     eax, 0
+        mov     ecx, S_Length
+        mov     esi, OFFSET S
+
+        Print_Sorted:
+            mov     al, [esi]
+
+            call    WriteDec
+
+            mov     al, ASCII_TAB
+            call    WriteChar
+
+            push    ecx
+            push    15
+            call    quickModulo
+
+            cmp     edx, 1
+            jne     No_Break_S
+
+            call    Crlf
+
+            No_Break_S:
+
+            inc     esi
+            inc     ebx
+
+        loop    Print_Sorted
     
-    dec     sortTimes
-    jmp     multiSort
+        dec     sortTimes
+
+    jmp     Sort_N_Times
+
+
+    ; --------------------------------
+
+
+    INVOKE  ExitProcess, 0
 
     quit:
 
+    INVOKE  ExitProcess, -1
 
-    exit
 main ENDP
 
 ; ---------------------------------------------------------------------
@@ -163,6 +202,7 @@ fillArray PROC
         mov     eax, HI
         inc     eax
         sub     eax, LO
+
         call    RandomRange
 
         add     eax, LO
@@ -223,44 +263,47 @@ mergeSort PROC
     mov     eax, [ebp + 12] ; [INDEX_P]
     mov     edi, [ebp + 8]  ; [ARRAY]
 
+
     cmp     eax, [ebp + 16] ; if p < r
-    jge     merge_done
+    jge     Merge_Done
 
-    add     eax, [ebp + 16]
-    mov     ebx, 2
+        add     eax, [ebp + 16]
+        mov     ebx, 2
 
-    cdq
+        cdq
 
-    div     ebx ; q = floor( (p + r) / 2 )
+        div     ebx ; q = floor( (p + r) / 2 )
 
-    mov     ebx, [ebp + 12] ; [INDEX_P]
-    mov     index_p, ebx
+        mov     ebx, [ebp + 12] ; [INDEX_P]
+        mov     index_p, ebx
 
-    mov     index_q, eax    ; [INDEX_Q]
+        mov     index_q, eax    ; [INDEX_Q]
 
-    mov     ebx, [ebp + 16] ; [INDEX_R]
-    mov     index_r, ebx
+        mov     ebx, [ebp + 16] ; [INDEX_R]
+        mov     index_r, ebx
 
-    push    index_q     ; q
-    push    index_p     ; p
-    push    edi         ; A
-    call    mergeSort   ; mergeSort(A, p, q)
 
-    inc     index_q
-    push    index_r     ; r
-    push    index_q     ; q + 1
-    push    edi         ; A
-    call    mergeSort   ; mergeSort(A, q + 1, r)
+        push    index_q     ; q
+        push    index_p     ; p
+        push    edi         ; A
+        call    mergeSort   ; mergeSort(A, p, q)
+
+        inc     index_q
+
+        push    index_r     ; r
+        push    index_q     ; q + 1
+        push    edi         ; A
+        call    mergeSort   ; mergeSort(A, q + 1, r)
     
-    dec     index_q
+        dec     index_q
 
-    push    index_r     ; [INDEX_R]
-    push    index_q     ; [INDEX_Q]
-    push    index_p     ; [INDEX_P]
-    push    edi         ; [ARRAY]
-    call    merge       ; merge(A, p, q, r)
+        push    index_r     ; [INDEX_R]
+        push    index_q     ; [INDEX_Q]
+        push    index_p     ; [INDEX_P]
+        push    edi         ; [ARRAY]
+        call    merge       ; merge(A, p, q, r)
 
-    merge_done:
+    Merge_Done:
 
 
     pop     edi
@@ -270,7 +313,7 @@ mergeSort PROC
     pop     eax
 
     leave
-    ret     12       ; STDCALL
+    ret     12
 mergeSort ENDP
 
 ; ---------------------------------------------------------------------
@@ -330,11 +373,13 @@ merge PROC
     push    ecx
     push    edi
     push    esi
+
     
     mov     esi, [ebp + 8] ; [ARRAY]
 
     mov     eax, [ebp + 16] ; [INDEX_Q]
     mov     ebx, [ebp + 12] ; [INDEX_P]
+
 
     sub     eax, ebx
 
@@ -373,6 +418,7 @@ merge PROC
     mov     edi, A_L
 
     i__to__n_1:
+
         cmp     ecx, n_1
         jge     i__to__n_1__Done
 
@@ -395,6 +441,7 @@ merge PROC
     mov     edi, A_R
 
     j__to__n_2:
+
         cmp     edx, n_2
         jge     j__to__n_2__Done
 
@@ -431,6 +478,7 @@ merge PROC
     mov     edx, 0       ; j
 
     k__equ__p__to__r:
+
         mov     ebx, [ebp + 20] ; [INDEX_R]
         cmp     index_k, ebx
         jg      k__equ__p__to__r__Done
@@ -446,10 +494,10 @@ merge PROC
 
         mov     al, [edi + edx] ; R[j]
 
-        cmp     al, -1      ;
+        cmp     al, INF     ;
         je      choose_Li   ;
                             ; - INF cases
-        cmp     bl, -1      ;
+        cmp     bl, INF     ;
         je      choose_Rj   ;
 
         cmp     ebx, eax
@@ -457,28 +505,31 @@ merge PROC
 
         choose_Li:
 
-        mov     eax, index_k
-        mov     [esi + eax], bl ; A[k] := L[i]
-        inc     ecx             ; i := i + 1
+            mov     eax, index_k
+            mov     [esi + eax], bl ; A[k] := L[i]
+            inc     ecx             ; i := i + 1
 
-        inc     index_k
+            inc     index_k
+
         jmp     k__equ__p__to__r
 
         choose_Rj:
         
-        mov     ebx, index_k
-        mov     [esi + ebx], al ; A[k] := R[j]
-        inc     edx             ; j := j + 1
+            mov     ebx, index_k
+            mov     [esi + ebx], al ; A[k] := R[j]
+            inc     edx             ; j := j + 1
 
-        inc     index_k
+            inc     index_k
+
         jmp     k__equ__p__to__r
 
     k__equ__p__to__r__Done:
 
-    quit:
 
     INVOKE HeapFree, hHeap, 0, A_L
     INVOKE HeapFree, hHeap, 0, A_R
+
+    quit:
 
 
     pop     esi

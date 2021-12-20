@@ -12,6 +12,8 @@ N = 15000
 LO = 1
 HI = 255
 
+ASCII_TAB = 9
+
 
 .data
 
@@ -26,20 +28,29 @@ main PROC
 
     call    Randomize
 
+
+    ; ---------- FILL ----------
+
+
     push    S_Length    ; [LENGTH]
     push    OFFSET S    ; [ARRAY]
     call    fillArray
 
+
+    ; --------------------------
+
+
     mov     eax, 0
     mov     ecx, S_Length
     mov     esi, OFFSET S
 
-    printLoop:
+    Print_Unsorted:
+
         mov     al, [esi]
 
         call    WriteDec
 
-        mov     al, 9
+        mov     al, ASCII_TAB
         call    WriteChar
 
         push    ecx
@@ -47,36 +58,52 @@ main PROC
         call    quickModulo
 
         cmp     edx, 1
-        jne     no_break
+        jne     No_Break_Uns
+
         call    Crlf
-        no_break:
+
+        No_Break_Uns:
 
         inc     esi
 
-    loop    printLoop
+    loop    Print_Unsorted
 
-    call    Crlf
+
+    ; ---------- SELECTION SORT ----------
+
 
     push    S_Length    ; [LENGTH]
     push    OFFSET S    ; [LIST]
-    call    sortList
+    call    selectionSort
+
+
+    ; ------------------------------------
+
+
+    call    Crlf
+    call    Crlf
 
     mov     edx, OFFSET break
-    call    Crlf
     call    WriteString
+
     call    Crlf
     call    Crlf
+
+
+    ; ------------------------------------
+
 
     mov     eax, 0
     mov     ecx, S_Length
     mov     esi, OFFSET S
 
-    printLoop2:
+    Print_Sorted:
+
         mov     al, [esi]
 
         call    WriteDec
 
-        mov     al, 9
+        mov     al, ASCII_TAB
         call    WriteChar
 
         push    ecx
@@ -84,15 +111,22 @@ main PROC
         call    quickModulo
 
         cmp     edx, 1
-        jne     no_break2
+        jne     No_Break_S
+
         call    Crlf
-        no_break2:
+
+        No_Break_S:
 
         inc     esi
 
-    loop    printLoop2
+    loop    Print_Sorted
+
+
+    ; ------------------------------------
+
     
-    exit
+    INVOKE  ExitProcess, 0
+
 main ENDP
 
 ; ---------------------------------------------------------------------
@@ -123,9 +157,11 @@ fillArray PROC
     mov     esi, [ebp + 8]   ; [ARRAY]
 
     fill:
+
         mov     eax, HI
         inc     eax
         sub     eax, LO
+
         call    RandomRange
 
         add     eax, LO
@@ -144,7 +180,7 @@ fillArray PROC
 fillArray ENDP
 
 ; ---------------------------------------------------------------------
-; NAME:     sortList
+; NAME:     selectionSort
 ;
 ; DESC:     Sorts a given byte array in ascending order using a selection sort.
 ;
@@ -159,13 +195,14 @@ fillArray ENDP
 ;
 ; CHANGES:  EAX (restored);     EBX (restored);     ECX (restored);     ESI (restored);
 ; ---------------------------------------------------------------------
-sortList PROC 
+selectionSort PROC 
     enter   12, 0
 
     push    eax
     push    ebx
     push    ecx
     push    esi
+
 
     mov     eax, 0
     mov     ebx, 0
@@ -203,10 +240,8 @@ sortList PROC
     ; Then, iterate through 'S' on the sub-interval [ i, n ] using 'j', and if an element at S[j] is smaller than the current minimum element S[k], select it. 'k := j'.
     ; Finally, if an element smaller than S[i] was found, swap it with S[k] and continue.
 
-    sortLoop:
-    
-        ; for i from 0 to n
-    
+    i__to__n:    
+
         add     esi, index_i
         mov     al, [esi]       ; S[i]
 
@@ -214,31 +249,29 @@ sortList PROC
         mov     index_k, ebx    ; k := i
         mov     index_j, ebx    ; j := i
 
-        subsort:
-
-            ; for j from i to n
+        j__equ__i__to__n:
 
             inc     index_j
             cmp     index_j, ecx ; (j >= [LENGTH]), same as saying, (j on the interval [ i, n ])
-            jge     swap
+            jge     Swap
 
             inc     esi
             mov     ebx, 0
             mov     bl, [esi]
 
-                                    ; Not quite the same as the pseudo-code but the same in essence. This just words it differently:
-                                    ; -----------------------------------------
-                                    ; where 'ax' is selected minimum value S[k] and 'bx' is value S[j]
-                                    ;
-                                    ; for . . .
-            cmp     ax, bx      ;-- ;
-            jle     subsort     ;-- ;     if S[k] <= S[j]
-                                    ;         continue
-                                    ;     else
-                                    ;         k := j
-                                    ;
-                                    ; endfor
-                                    ; -----------------------------------------
+                                      ; Not quite the same as the pseudo-code but the same in essence. This just words it differently:
+                                      ; -----------------------------------------
+                                      ; where 'ax' is selected minimum value S[k] and 'bx' is value S[j]
+                                      ;
+                                      ; for . . .
+            cmp     ax, bx            ;-- ;
+            jle     j__equ__i__to__n  ;-- ;     if S[k] <= S[j]
+                                      ;         continue
+                                      ;     else
+                                      ;         k := j
+                                      ;
+                                      ; endfor
+                                      ; -----------------------------------------
 
             ; else
 
@@ -247,13 +280,15 @@ sortList PROC
             mov     ebx, index_j
             mov     index_k, ebx ; k := j
 
-            jmp     subsort
+            jmp     j__equ__i__to__n
 
-            swap:
+            Swap:
+
                 mov     esi, [ebp + 8] ; Reset array position
                 mov     ebx, index_i
+
                 cmp     index_k, ebx   ; Another slight difference from the pseudo-code
-                je      noSort
+                je      No_Swap
 
                 ; if k != i
 
@@ -266,17 +301,18 @@ sortList PROC
 
                 call    exchangeElements ; swap S[i] <-> S[k]
 
-            noSort:
+            No_Swap:
                 ; --------------
 
         inc     index_i
         cmp     index_i, ecx ; (i >= [LENGTH]), so 'i' up to 'n'.
-        jge     sortFinish
+        jge     i__to__n__Done
 
-    jmp     sortLoop
+    jmp     i__to__n
 
-    sortFinish:
+    i__to__n__Done:
         ; --------------
+
 
     pop     esi
     pop     ecx
@@ -285,7 +321,7 @@ sortList PROC
 
     leave
     ret     8
-sortList ENDP
+selectionSort ENDP
 
 ; ---------------------------------------------------------------------
 ; NAME:     quickModulo
